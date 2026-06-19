@@ -16,7 +16,7 @@ class VSSClient:
                 response = self.client.request(method, f"{self.base_url}{path}", **kwargs)
                 response.raise_for_status()
                 return response
-            except (httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                 last_exc = exc
                 if attempt == self.max_retries - 1:
                     raise
@@ -51,6 +51,6 @@ class VSSClient:
     def health_check(self) -> bool:
         try:
             self._request_with_retry("GET", "/health")
-        except (httpx.TimeoutException, httpx.HTTPStatusError):
+        except (httpx.TransportError, httpx.HTTPStatusError):
             return False
         return True
