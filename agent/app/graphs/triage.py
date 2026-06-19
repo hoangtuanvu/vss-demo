@@ -1,5 +1,6 @@
 from typing import Callable, TypedDict
 
+from app import store
 from app.models import Severity
 
 
@@ -46,3 +47,15 @@ def make_classify_severity_node(llm) -> Callable[[dict], dict]:
         return {"severity": text}
 
     return classify_severity
+
+
+def make_dedupe_node(session_factory, window_seconds: int) -> Callable[[dict], dict]:
+    def dedupe(state: dict) -> dict:
+        dedupe_key = f"{state['hazard_type']}:{state['zone']}"
+        with session_factory() as session:
+            existing = store.get_open_incident_by_dedupe_key(session, dedupe_key, window_seconds)
+            if existing is not None:
+                return {"dedupe_key": dedupe_key, "incident_id": existing.id, "is_new": False}
+        return {"dedupe_key": dedupe_key, "incident_id": None, "is_new": True}
+
+    return dedupe
