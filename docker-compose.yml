@@ -1,0 +1,41 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    ports:
+      - "8554:8554"
+    volumes:
+      - ./infra/mediamtx.yml:/mediamtx.yml:ro
+
+  agent:
+    build: ./agent
+    ports:
+      - "8000:8000"
+    environment:
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NIM_BASE_URL: ${NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-nvidia/nemotron-nano-9b-v2}
+      VSS_BASE_URL: ${VSS_BASE_URL:-http://localhost:8001}
+      DATABASE_URL: sqlite:///./data/warehouse.db
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-8}
+      DEDUPE_WINDOW_SECONDS: ${DEDUPE_WINDOW_SECONDS:-300}
+      MEDIAMTX_RTSP_URL: rtsp://mediamtx:8554
+    volumes:
+      - agent-data:/app/data
+      - agent-uploads:/app/uploads
+    depends_on:
+      - mediamtx
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - agent
+
+volumes:
+  agent-data:
+  agent-uploads:
