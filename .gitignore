@@ -1,0 +1,9 @@
+agent/.venv/
+agent/.env
+agent/uploads/
+agent/*.db
+frontend/node_modules/
+frontend/.next/
+__pycache__/
+*.pyc
+.DS_Store

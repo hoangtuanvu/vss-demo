@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+sqlalchemy
+httpx
+respx
+sse-starlette
+langgraph
+langchain-nvidia-ai-endpoints
+pytest
+pytest-asyncio
