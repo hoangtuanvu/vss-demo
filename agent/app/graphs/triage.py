@@ -1,7 +1,7 @@
 from typing import Callable, TypedDict
 
 from app import store
-from app.models import Severity
+from app.models import HazardType, Severity, incident_to_dict
 
 
 class TriageState(TypedDict):
@@ -59,3 +59,30 @@ def make_dedupe_node(session_factory, window_seconds: int) -> Callable[[dict], d
         return {"dedupe_key": dedupe_key, "incident_id": None, "is_new": True}
 
     return dedupe
+
+
+def make_persist_incident_node(session_factory, broadcaster) -> Callable[[dict], dict]:
+    def persist_incident(state: dict) -> dict:
+        with session_factory() as session:
+            if state["is_new"]:
+                incident = store.create_incident(
+                    session,
+                    hazard_type=HazardType(state["hazard_type"]),
+                    severity=Severity(state["severity"]),
+                    zone=state["zone"],
+                    caption=state["caption"],
+                    raw_alert_payload=state["alert"],
+                    dedupe_key=state["dedupe_key"],
+                )
+            else:
+                incident = store.update_incident(
+                    session,
+                    state["incident_id"],
+                    caption=state["caption"],
+                    severity=Severity(state["severity"]),
+                    raw_alert_payload=state["alert"],
+                )
+            broadcaster.publish(incident_to_dict(incident))
+        return {"incident_id": incident.id}
+
+    return persist_incident
