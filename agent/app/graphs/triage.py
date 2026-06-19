@@ -128,3 +128,28 @@ def make_escalate_notify_node(webhook_url: str, session_factory) -> Callable[[di
         return {"escalated": True}
 
     return escalate_notify
+
+
+from typing import Literal
+
+from langgraph.graph import END, StateGraph
+
+
+def route_by_severity(state: dict) -> Literal["critical", "end"]:
+    return "critical" if state["severity"] == Severity.CRITICAL.value else "end"
+
+
+def build_triage_graph(llm, vss_client, session_factory, webhook_url: str, dedupe_window_seconds: int, broadcaster):
+    graph = StateGraph(TriageState)
+    graph.add_node("classify_severity", make_classify_severity_node(llm))
+    graph.add_node("dedupe", make_dedupe_node(session_factory, dedupe_window_seconds))
+    graph.add_node("persist_incident", make_persist_incident_node(session_factory, broadcaster))
+    graph.add_node("generate_report", make_generate_report_node(vss_client, session_factory))
+    graph.add_node("escalate_notify", make_escalate_notify_node(webhook_url, session_factory))
+    graph.set_entry_point("classify_severity")
+    graph.add_edge("classify_severity", "dedupe")
+    graph.add_edge("dedupe", "persist_incident")
+    graph.add_conditional_edges("persist_incident", route_by_severity, {"critical": "generate_report", "end": END})
+    graph.add_edge("generate_report", "escalate_notify")
+    graph.add_edge("escalate_notify", END)
+    return graph.compile()
