@@ -86,3 +86,45 @@ def make_persist_incident_node(session_factory, broadcaster) -> Callable[[dict],
         return {"incident_id": incident.id}
 
     return persist_incident
+
+
+import logging
+
+import httpx
+
+from app.models import IncidentStatus
+
+logger = logging.getLogger(__name__)
+
+
+def make_generate_report_node(vss_client, session_factory) -> Callable[[dict], dict]:
+    def generate_report(state: dict) -> dict:
+        report_text = vss_client.generate_report(state["incident_id"])
+        with session_factory() as session:
+            store.update_incident(session, state["incident_id"], report_text=report_text)
+        return {"report_text": report_text}
+
+    return generate_report
+
+
+def make_escalate_notify_node(webhook_url: str, session_factory) -> Callable[[dict], dict]:
+    def escalate_notify(state: dict) -> dict:
+        if not webhook_url:
+            logger.warning("No webhook URL configured, skipping escalation for incident %s", state["incident_id"])
+            return {"escalated": False}
+        httpx.post(
+            webhook_url,
+            json={
+                "incident_id": state["incident_id"],
+                "hazard_type": state["hazard_type"],
+                "zone": state["zone"],
+                "caption": state["caption"],
+                "report_text": state.get("report_text"),
+            },
+            timeout=5.0,
+        )
+        with session_factory() as session:
+            store.update_incident(session, state["incident_id"], status=IncidentStatus.ESCALATED)
+        return {"escalated": True}
+
+    return escalate_notify
