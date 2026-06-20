@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
 from app import store
@@ -52,6 +53,12 @@ def create_app(deps: AppDependencies) -> FastAPI:
             poll_task.cancel()
 
     app = FastAPI(title="Warehouse Safety Monitor Agent", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health")
     def health():
