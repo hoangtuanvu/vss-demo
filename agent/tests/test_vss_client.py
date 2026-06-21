@@ -100,6 +100,27 @@ def test_chat_sends_openai_style_messages_and_parses_content():
 
 
 @respx.mock
+def test_chat_strips_agent_think_and_incidents_noise():
+    respx.post("http://agent.test/chat").mock(
+        return_value=Response(200, json={
+            "choices": [{"message": {
+                "content": (
+                    "<agent-think>plan: call multi_report_agent</agent-think>\n"
+                    "Two PPE violations were recorded today.\n"
+                    "<incidents>\n"
+                    '{ "incidents": [] }\n'
+                    "</incidents>"
+                ),
+                "role": "assistant",
+            }}],
+        })
+    )
+    client = make_client()
+    answer = client.chat("how many ppe violations today?")
+    assert answer == "Two PPE violations were recorded today."
+
+
+@respx.mock
 def test_generate_report_builds_prompt_from_incident_and_calls_chat():
     route = respx.post("http://agent.test/chat").mock(
         return_value=Response(200, json={

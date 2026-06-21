@@ -2,6 +2,8 @@ import time
 
 import httpx
 
+from app.chat_format import clean_chat_response
+
 # The real alert-bridge incident feed uses its own human-readable category
 # names (observed live against the deployed warehouse-blueprint sample
 # dataset), not our HazardType enum values. Map known categories here;
@@ -72,7 +74,8 @@ class VSSClient:
             "/chat",
             json={"messages": [{"role": "user", "content": message}]},
         )
-        return response.json()["choices"][0]["message"]["content"]
+        content = response.json()["choices"][0]["message"]["content"]
+        return clean_chat_response(content)
 
     def generate_report(self, incident: dict) -> str:
         prompt = (
