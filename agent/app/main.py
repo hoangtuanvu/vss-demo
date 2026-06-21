@@ -1,7 +1,8 @@
 import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -9,10 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
 from app import store
+from app.alert_rules import HAZARD_ALERT_RULES
 from app.events import IncidentBroadcaster
 from app.models import Severity, incident_to_dict
 from app.poller import poll_loop
 from app.streaming import start_rtsp_loopback
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,6 +29,7 @@ class AppDependencies:
     upload_dir: Path
     mediamtx_rtsp_url: str
     poll_interval_seconds: int = 8
+    active_rule_ids: list[str] = field(default_factory=list)
 
 
 async def _alert_event_generator(broadcaster: IncidentBroadcaster):
@@ -75,6 +80,20 @@ def create_app(deps: AppDependencies) -> FastAPI:
             stream_url = start_rtsp_loopback(dest, dest.stem, deps.mediamtx_rtsp_url)
         except Exception:
             raise HTTPException(status_code=502, detail="Failed to start video stream ingestion")
+
+        if deps.active_rule_ids:
+            try:
+                deps.vss_client.delete_alert_rules(deps.active_rule_ids)
+            except Exception:
+                logger.warning("Failed to delete previous alert rules: %s", deps.active_rule_ids)
+            deps.active_rule_ids = []
+        try:
+            deps.active_rule_ids = deps.vss_client.register_alert_rules(
+                stream_url, dest.stem, HAZARD_ALERT_RULES
+            )
+        except Exception:
+            logger.warning("Failed to register alert rules for stream %s", stream_url)
+
         return {"stream_url": stream_url}
 
     @app.get("/incidents")
@@ -89,13 +108,13 @@ def create_app(deps: AppDependencies) -> FastAPI:
             if incident is None:
                 raise HTTPException(status_code=404, detail="incident not found")
             if incident.report_text is None and incident.severity == Severity.CRITICAL:
-                report_text = deps.vss_client.generate_report(incident.id)
+                report_text = deps.vss_client.generate_report(incident_to_dict(incident))
                 incident = store.update_incident(session, incident.id, report_text=report_text)
             return incident_to_dict(incident)
 
     @app.post("/chat")
     def chat(payload: dict):
-        result = deps.chat_graph.invoke({"message": payload["message"], "intent": None, "answer": None})
+        result = deps.chat_graph.invoke({"message": payload["message"], "answer": None})
         return {"answer": result["answer"]}
 
     @app.get("/alerts/stream")

@@ -9,14 +9,25 @@ from app.models import HazardType, Severity
 
 
 class FakeVSSClient:
-    def get_new_alerts(self, since_cursor):
+    def __init__(self):
+        self.registered_calls = []
+        self.deleted_calls = []
+
+    def get_new_alerts(self, since_timestamp):
         return []
 
-    def generate_report(self, incident_id):
+    def generate_report(self, incident):
         return "generated report"
 
     def health_check(self):
         return True
+
+    def register_alert_rules(self, stream_url, sensor_id, rules):
+        self.registered_calls.append((stream_url, sensor_id, rules))
+        return [f"rule-{i}" for i in range(len(rules))]
+
+    def delete_alert_rules(self, rule_ids):
+        self.deleted_calls.append(rule_ids)
 
 
 class FakeChatGraph:
@@ -24,12 +35,12 @@ class FakeChatGraph:
         return {"answer": "the chat answer"}
 
 
-def make_test_app(session_factory, tmp_path, broadcaster=None):
+def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None):
     deps = AppDependencies(
         session_factory=session_factory,
         triage_graph=None,
         chat_graph=FakeChatGraph(),
-        vss_client=FakeVSSClient(),
+        vss_client=vss_client or FakeVSSClient(),
         broadcaster=broadcaster or IncidentBroadcaster(),
         upload_dir=tmp_path,
         mediamtx_rtsp_url="rtsp://localhost:8554",
@@ -92,12 +103,29 @@ def test_chat_endpoint_returns_answer(session_factory, tmp_path):
     assert response.json() == {"answer": "the chat answer"}
 
 
-def test_upload_starts_rtsp_loopback(session_factory, tmp_path, monkeypatch):
+def test_upload_starts_rtsp_loopback_and_registers_alert_rules(session_factory, tmp_path, monkeypatch):
     monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
-    app = make_test_app(session_factory, tmp_path)
+    vss_client = FakeVSSClient()
+    app = make_test_app(session_factory, tmp_path, vss_client=vss_client)
     with TestClient(app) as client:
         response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
     assert response.json() == {"stream_url": "rtsp://localhost:8554/clip"}
+    assert len(vss_client.registered_calls) == 1
+    stream_url, sensor_id, rules = vss_client.registered_calls[0]
+    assert stream_url == "rtsp://localhost:8554/clip"
+    assert sensor_id == "clip"
+    assert len(rules) == 5
+
+
+def test_upload_deletes_previous_rules_before_registering_new_ones(session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
+    vss_client = FakeVSSClient()
+    app = make_test_app(session_factory, tmp_path, vss_client=vss_client)
+    with TestClient(app) as client:
+        client.post("/upload", files={"file": ("clip1.mp4", b"fake-bytes", "video/mp4")})
+        client.post("/upload", files={"file": ("clip2.mp4", b"fake-bytes", "video/mp4")})
+    assert len(vss_client.deleted_calls) == 1
+    assert vss_client.deleted_calls[0] == ["rule-0", "rule-1", "rule-2", "rule-3", "rule-4"]
 
 
 def test_upload_returns_503_when_vss_unreachable(session_factory, tmp_path):
@@ -105,12 +133,7 @@ def test_upload_returns_503_when_vss_unreachable(session_factory, tmp_path):
         def health_check(self):
             return False
 
-    deps = AppDependencies(
-        session_factory=session_factory, triage_graph=None, chat_graph=FakeChatGraph(),
-        vss_client=UnreachableVSSClient(), broadcaster=IncidentBroadcaster(), upload_dir=tmp_path,
-        mediamtx_rtsp_url="rtsp://localhost:8554", poll_interval_seconds=9999,
-    )
-    app = create_app(deps)
+    app = make_test_app(session_factory, tmp_path, vss_client=UnreachableVSSClient())
     with TestClient(app) as client:
         response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
     assert response.status_code == 503
