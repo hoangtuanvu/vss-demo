@@ -30,6 +30,7 @@ class AppDependencies:
     mediamtx_rtsp_url: str
     poll_interval_seconds: int = 8
     active_rule_ids: list[str] = field(default_factory=list)
+    active_sensor_id: str | None = None
 
 
 async def _alert_event_generator(broadcaster: IncidentBroadcaster):
@@ -81,6 +82,8 @@ def create_app(deps: AppDependencies) -> FastAPI:
         except Exception:
             raise HTTPException(status_code=502, detail="Failed to start video stream ingestion")
 
+        deps.active_sensor_id = dest.stem
+
         if deps.active_rule_ids:
             try:
                 deps.vss_client.delete_alert_rules(deps.active_rule_ids)
@@ -114,7 +117,10 @@ def create_app(deps: AppDependencies) -> FastAPI:
 
     @app.post("/chat")
     def chat(payload: dict):
-        result = deps.chat_graph.invoke({"message": payload["message"], "answer": None})
+        message = payload["message"]
+        if deps.active_sensor_id:
+            message = f"For camera/sensor '{deps.active_sensor_id}': {message}"
+        result = deps.chat_graph.invoke({"message": message, "answer": None})
         return {"answer": result["answer"]}
 
     @app.get("/alerts/stream")

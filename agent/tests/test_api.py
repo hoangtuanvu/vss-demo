@@ -31,15 +31,19 @@ class FakeVSSClient:
 
 
 class FakeChatGraph:
+    def __init__(self):
+        self.invocations = []
+
     def invoke(self, state):
+        self.invocations.append(state)
         return {"answer": "the chat answer"}
 
 
-def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None):
+def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None, chat_graph=None):
     deps = AppDependencies(
         session_factory=session_factory,
         triage_graph=None,
-        chat_graph=FakeChatGraph(),
+        chat_graph=chat_graph or FakeChatGraph(),
         vss_client=vss_client or FakeVSSClient(),
         broadcaster=broadcaster or IncidentBroadcaster(),
         upload_dir=tmp_path,
@@ -97,10 +101,12 @@ def test_incident_detail_404_for_missing_incident(session_factory, tmp_path):
 
 
 def test_chat_endpoint_returns_answer(session_factory, tmp_path):
-    app = make_test_app(session_factory, tmp_path)
+    chat_graph = FakeChatGraph()
+    app = make_test_app(session_factory, tmp_path, chat_graph=chat_graph)
     with TestClient(app) as client:
         response = client.post("/chat", json={"message": "how many ppe violations today?"})
     assert response.json() == {"answer": "the chat answer"}
+    assert chat_graph.invocations[0]["message"] == "how many ppe violations today?"
 
 
 def test_upload_starts_rtsp_loopback_and_registers_alert_rules(session_factory, tmp_path, monkeypatch):
@@ -126,6 +132,18 @@ def test_upload_deletes_previous_rules_before_registering_new_ones(session_facto
         client.post("/upload", files={"file": ("clip2.mp4", b"fake-bytes", "video/mp4")})
     assert len(vss_client.deleted_calls) == 1
     assert vss_client.deleted_calls[0] == ["rule-0", "rule-1", "rule-2", "rule-3", "rule-4"]
+
+
+def test_chat_includes_active_sensor_context_after_upload(session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
+    chat_graph = FakeChatGraph()
+    app = make_test_app(session_factory, tmp_path, chat_graph=chat_graph)
+    with TestClient(app) as client:
+        client.post("/upload", files={"file": ("forklift_proximity.mp4", b"fake-bytes", "video/mp4")})
+        client.post("/chat", json={"message": "how many incidents today?"})
+    assert chat_graph.invocations[0]["message"] == (
+        "For camera/sensor 'forklift_proximity': how many incidents today?"
+    )
 
 
 def test_upload_succeeds_even_when_register_alert_rules_fails(session_factory, tmp_path, monkeypatch):
