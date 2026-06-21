@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     nvidia_api_key: str = ""
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
     llm_model_name: str = "nvidia/nemotron-nano-9b-v2"
-    vss_base_url: str = "http://localhost:8000"
+    vss_agent_base_url: str = "http://localhost:8000"
+    vss_alert_bridge_base_url: str = "http://localhost:9080"
     database_url: str = "sqlite:///./warehouse.db"
     slack_webhook_url: str = ""
     poll_interval_seconds: int = 8

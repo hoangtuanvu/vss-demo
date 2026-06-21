@@ -14,7 +14,8 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       NIM_BASE_URL: ${NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
       LLM_MODEL_NAME: ${LLM_MODEL_NAME:-nvidia/nemotron-nano-9b-v2}
-      VSS_BASE_URL: ${VSS_BASE_URL:-http://localhost:8001}
+      VSS_AGENT_BASE_URL: ${VSS_AGENT_BASE_URL:-http://localhost:8000}
+      VSS_ALERT_BRIDGE_BASE_URL: ${VSS_ALERT_BRIDGE_BASE_URL:-http://localhost:9080}
       DATABASE_URL: sqlite:///./data/warehouse.db
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-8}
