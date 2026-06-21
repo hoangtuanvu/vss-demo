@@ -21,5 +21,6 @@ describe("IncidentDetailPage", () => {
     });
     expect(screen.getByTestId("incident-severity").textContent).toBe("critical");
     expect(screen.getByTestId("incident-report").textContent).toBe("Incident report text");
+    expect(screen.getByTestId("back-link").textContent).toContain("Dashboard");
   });
 });

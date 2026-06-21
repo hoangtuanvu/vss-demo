@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Incident, fetchIncident } from "../../../lib/api";
 
@@ -30,7 +31,14 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
     <main className="min-h-screen">
       <div className="hazard-tape h-2 w-full" aria-hidden="true" />
       <div className="mx-auto max-w-2xl px-6 py-16">
-        <div className={`border-l-4 ${borderColor} border-y border-r border-paper/15 bg-panel p-6`}>
+        <Link
+          href="/"
+          data-testid="back-link"
+          className="font-mono text-xs uppercase tracking-widest text-paper/50 hover:text-caution"
+        >
+          ← Dashboard
+        </Link>
+        <div className={`mt-6 border-l-4 ${borderColor} border-y border-r border-paper/15 bg-panel p-6`}>
           <div className="flex items-baseline justify-between font-mono text-xs uppercase tracking-widest">
             <span data-testid="incident-severity" className="text-paper">
               {incident.severity}
