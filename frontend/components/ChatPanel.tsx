@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 import { sendChatMessage } from "../lib/api";
 
@@ -34,7 +35,11 @@ export default function ChatPanel() {
           >
             <span className="font-mono text-xs uppercase tracking-widest text-paper/40">{message.role}</span>
             <br />
-            {message.text}
+            {message.role === "assistant" ? (
+              <ReactMarkdown>{message.text}</ReactMarkdown>
+            ) : (
+              message.text
+            )}
           </li>
         ))}
       </ul>
