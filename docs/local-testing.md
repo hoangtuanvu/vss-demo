@@ -47,8 +47,8 @@ To see real critical/warning/info classification, set `NVIDIA_API_KEY` in
 the `agent` environment even while using the mock VSS — NIM and VSS are
 independent.
 
-To make the mock emit a *new* alert while a page is already watching
-`/monitor` (to prove SSE is live, not historical), append an entry to the
+To make the mock emit a *new* alert while a page is already watching the
+dashboard at `/` (to prove SSE is live, not historical), append an entry to the
 `ALERTS` list in `infra/mock_vss.py` with the next `cursor` value and restart
 the script — the next poll cycle (`POLL_INTERVAL_SECONDS`, default 8s) picks
 it up.
@@ -87,16 +87,18 @@ curl -s -i -X POST localhost:8000/upload \
 - `502` — ffmpeg failed to start (shouldn't happen in the container image,
   which has ffmpeg installed).
 
-Or upload through the frontend at `http://localhost:3001/upload`.
+Or upload through the dashboard at `http://localhost:3001/`.
 
 ## 3. Check the output
+
+Everything lives on the one dashboard at `http://localhost:3001/`:
 
 | Where | What to look for |
 |---|---|
 | `curl localhost:8000/incidents` | Full incident history (works regardless of when you opened any page) |
-| `http://localhost:3001/stats` | Counts by `hazard_type:severity` |
-| `http://localhost:3001/monitor` | **Live only** — open this *before* the next alert lands, it does not replay history |
-| Chat panel on `/monitor` | Ask something; routes through `/chat` → intent classification → `ask-video`/`query-analytics`/`search-archive`/SOP node on the VSS client in use |
+| Stats panel on the dashboard | Counts by `hazard_type:severity`, updates live as alerts stream in |
+| Incident feed on the dashboard | **Live only** — open this *before* the next alert lands, it does not replay history |
+| Chat panel on the dashboard | Ask something; routes through `/chat` → intent classification → `ask-video`/`query-analytics`/`search-archive`/SOP node on the VSS client in use |
 | `docker compose logs agent` | Poller/triage errors, e.g. malformed alert payloads |
 
 ## 4. Tear down
