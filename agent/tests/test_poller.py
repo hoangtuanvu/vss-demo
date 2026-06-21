@@ -6,8 +6,8 @@ class FakeVSSClient:
         self._batches = list(batches)
         self.calls = []
 
-    def get_new_alerts(self, since_cursor):
-        self.calls.append(since_cursor)
+    def get_new_alerts(self, since_timestamp):
+        self.calls.append(since_timestamp)
         return self._batches.pop(0) if self._batches else []
 
 
@@ -20,21 +20,31 @@ class FakeGraph:
         return state
 
 
-def test_run_poll_iteration_advances_cursor_and_processes_each_alert_once(session_factory):
+def test_run_poll_iteration_advances_timestamp_and_processes_each_alert_once(session_factory):
     batch1 = [
-        {"hazard_type": "ppe", "zone": "dock-1", "caption": "no helmet", "cursor": "c1"},
-        {"hazard_type": "fall", "zone": "aisle-3", "caption": "person down", "cursor": "c2"},
+        {"id": "i1", "category": "ppe", "sensor_id": "dock-1", "timestamp": "2026-06-21T12:00:00Z", "description": "no helmet"},
+        {"id": "i2", "category": "fall", "sensor_id": "aisle-3", "timestamp": "2026-06-21T12:01:00Z", "description": "person down"},
     ]
     batch2 = [
-        {"hazard_type": "spill", "zone": "aisle-1", "caption": "spill", "cursor": "c3"},
+        {"id": "i3", "category": "spill", "sensor_id": "aisle-1", "timestamp": "2026-06-21T12:02:00Z", "description": "spill"},
     ]
     vss_client = FakeVSSClient([batch1, batch2])
     graph = FakeGraph()
 
-    cursor_after_first = run_poll_iteration(vss_client, graph, None, session_factory)
-    cursor_after_second = run_poll_iteration(vss_client, graph, cursor_after_first, session_factory)
+    ts_after_first = run_poll_iteration(vss_client, graph, None, session_factory)
+    ts_after_second = run_poll_iteration(vss_client, graph, ts_after_first, session_factory)
 
-    assert cursor_after_first == "c2"
-    assert cursor_after_second == "c3"
-    assert vss_client.calls == [None, "c2"]
+    assert ts_after_first == "2026-06-21T12:01:00Z"
+    assert ts_after_second == "2026-06-21T12:02:00Z"
+    assert vss_client.calls == [None, "2026-06-21T12:01:00Z"]
     assert len(graph.invocations) == 3
+    assert graph.invocations[0]["hazard_type"] == "ppe"
+    assert graph.invocations[0]["zone"] == "dock-1"
+    assert graph.invocations[0]["caption"] == "no helmet"
+
+
+def test_run_poll_iteration_returns_unchanged_timestamp_when_no_alerts(session_factory):
+    vss_client = FakeVSSClient([[]])
+    graph = FakeGraph()
+    result = run_poll_iteration(vss_client, graph, "2026-06-21T12:00:00Z", session_factory)
+    assert result == "2026-06-21T12:00:00Z"
