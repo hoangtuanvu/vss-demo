@@ -7,7 +7,7 @@ def start_rtsp_loopback(video_path: Path, stream_name: str, mediamtx_rtsp_url: s
     subprocess.Popen(
         [
             "ffmpeg", "-re", "-stream_loop", "-1", "-i", str(video_path),
-            "-c", "copy", "-f", "rtsp", rtsp_url,
+            "-c", "copy", "-f", "rtsp", "-rtsp_transport", "tcp", rtsp_url,
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

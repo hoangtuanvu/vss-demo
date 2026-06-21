@@ -2,3 +2,4 @@ paths:
   all:
     source: publisher
 rtspAddress: :8554
+protocols: [tcp]

@@ -16,3 +16,5 @@ def test_start_rtsp_loopback_returns_url_and_invokes_ffmpeg(tmp_path):
     assert args[0] == "ffmpeg"
     assert str(video_path) in args
     assert "rtsp://localhost:8554/cam1" in args
+    assert "-rtsp_transport" in args
+    assert args[args.index("-rtsp_transport") + 1] == "tcp"
