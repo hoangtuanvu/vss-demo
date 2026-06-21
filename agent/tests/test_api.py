@@ -128,6 +128,21 @@ def test_upload_deletes_previous_rules_before_registering_new_ones(session_facto
     assert vss_client.deleted_calls[0] == ["rule-0", "rule-1", "rule-2", "rule-3", "rule-4"]
 
 
+def test_upload_succeeds_even_when_register_alert_rules_fails(session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
+
+    class FailingRegisterVSSClient(FakeVSSClient):
+        def register_alert_rules(self, stream_url, sensor_id, rules):
+            raise RuntimeError("alert-bridge unreachable")
+
+    vss_client = FailingRegisterVSSClient()
+    app = make_test_app(session_factory, tmp_path, vss_client=vss_client)
+    with TestClient(app) as client:
+        response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
+    assert response.status_code == 200
+    assert response.json() == {"stream_url": "rtsp://localhost:8554/clip"}
+
+
 def test_upload_returns_503_when_vss_unreachable(session_factory, tmp_path):
     class UnreachableVSSClient(FakeVSSClient):
         def health_check(self):
