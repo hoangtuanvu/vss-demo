@@ -18,12 +18,12 @@ def build_app(settings: Settings) -> tuple[FastAPI, AppDependencies]:
     Base.metadata.create_all(engine)
     session_factory = make_session_factory(engine)
     llm = get_chat_model(settings)
-    vss_client = VSSClient(settings.vss_base_url)
+    vss_client = VSSClient(settings.vss_agent_base_url, settings.vss_alert_bridge_base_url)
     triage_graph = build_triage_graph(
         llm, vss_client, session_factory, settings.slack_webhook_url,
         settings.dedupe_window_seconds, broadcaster,
     )
-    chat_graph = build_chat_graph(llm, vss_client, session_factory)
+    chat_graph = build_chat_graph(vss_client)
     deps = AppDependencies(
         session_factory=session_factory,
         triage_graph=triage_graph,
