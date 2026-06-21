@@ -48,3 +48,18 @@ def test_run_poll_iteration_returns_unchanged_timestamp_when_no_alerts(session_f
     graph = FakeGraph()
     result = run_poll_iteration(vss_client, graph, "2026-06-21T12:00:00Z", session_factory)
     assert result == "2026-06-21T12:00:00Z"
+
+
+def test_run_poll_iteration_skips_unrecognized_category_without_crashing(session_factory):
+    batch = [
+        {"id": "i1", "category": "robot_malfunction", "sensor_id": "dock-1", "timestamp": "2026-06-21T12:00:00Z", "description": "unknown hazard"},
+        {"id": "i2", "category": "fall", "sensor_id": "aisle-3", "timestamp": "2026-06-21T12:01:00Z", "description": "person down"},
+    ]
+    vss_client = FakeVSSClient([batch])
+    graph = FakeGraph()
+
+    result = run_poll_iteration(vss_client, graph, None, session_factory)
+
+    assert result == "2026-06-21T12:01:00Z"
+    assert len(graph.invocations) == 1
+    assert graph.invocations[0]["hazard_type"] == "fall"
