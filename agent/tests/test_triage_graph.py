@@ -14,8 +14,8 @@ class FakeLLM:
 
 
 class FakeVSSClient:
-    def generate_report(self, incident_id):
-        return f"report for {incident_id}"
+    def generate_report(self, incident):
+        return f"report for {incident['id']}"
 
 
 def make_initial_state(hazard_type, zone, caption):

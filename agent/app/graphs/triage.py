@@ -99,7 +99,10 @@ logger = logging.getLogger(__name__)
 
 def make_generate_report_node(vss_client, session_factory) -> Callable[[dict], dict]:
     def generate_report(state: dict) -> dict:
-        report_text = vss_client.generate_report(state["incident_id"])
+        with session_factory() as session:
+            incident = store.get_incident(session, state["incident_id"])
+            incident_dict = incident_to_dict(incident)
+        report_text = vss_client.generate_report(incident_dict)
         with session_factory() as session:
             store.update_incident(session, state["incident_id"], report_text=report_text)
         return {"report_text": report_text}
