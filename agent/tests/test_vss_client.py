@@ -33,6 +33,34 @@ def test_get_new_alerts_parses_and_sorts_by_timestamp():
 
 
 @respx.mock
+def test_get_new_alerts_normalizes_real_payload_shape():
+    respx.get("http://alertbridge.test/api/v1/realtime/incidents").mock(
+        return_value=Response(200, json={
+            "status": "success",
+            "count": 2,
+            "total": 2,
+            "timestamp": "x",
+            "incidents": [
+                {
+                    "Id": "abc123", "_id": "abc123", "sensorId": "Camera_01",
+                    "category": "PPE Violation", "timestamp": "2026-06-21T12:00:00Z",
+                },
+                {
+                    "Id": "def456", "_id": "def456", "sensorId": "Camera_02",
+                    "category": "Load Quality Violation", "timestamp": "2026-06-21T12:01:00Z",
+                },
+            ],
+        })
+    )
+    client = make_client()
+    alerts = client.get_new_alerts(None)
+    assert alerts[0]["category"] == "ppe"
+    assert alerts[0]["sensor_id"] == "Camera_01"
+    assert alerts[0]["description"] == "PPE Violation"
+    assert alerts[1]["category"] == "Load Quality Violation"
+
+
+@respx.mock
 def test_get_new_alerts_passes_start_time_param():
     route = respx.get("http://alertbridge.test/api/v1/realtime/incidents").mock(
         return_value=Response(200, json={"status": "success", "count": 0, "total": 0, "timestamp": "x", "incidents": []})

@@ -2,6 +2,18 @@ import time
 
 import httpx
 
+# The real alert-bridge incident feed uses its own human-readable category
+# names (observed live against the deployed warehouse-blueprint sample
+# dataset), not our HazardType enum values. Map known categories here;
+# anything absent passes through unmapped and is dropped by the poller's
+# existing unrecognized-category skip (see app/poller.py).
+CATEGORY_MAP = {
+    "ppe violation": "ppe",
+    "spillover violation": "spill",
+    "pathway obstruction violation": "spill",
+    "near miss violation": "forklift_proximity",
+}
+
 
 class VSSClient:
     def __init__(
@@ -39,7 +51,19 @@ class VSSClient:
         )
         incidents = response.json()["incidents"]
         incidents.sort(key=lambda incident: incident["timestamp"])
-        return incidents
+        return [self._normalize_alert(incident) for incident in incidents]
+
+    @staticmethod
+    def _normalize_alert(incident: dict) -> dict:
+        raw_category = incident.get("category", "")
+        category = CATEGORY_MAP.get(raw_category.strip().lower(), raw_category)
+        return {
+            "id": incident.get("id") or incident.get("Id") or incident.get("_id"),
+            "category": category,
+            "sensor_id": incident.get("sensor_id") or incident.get("sensorId", ""),
+            "timestamp": incident["timestamp"],
+            "description": incident.get("description") or raw_category,
+        }
 
     def chat(self, message: str) -> str:
         response = self._request_with_retry(
