@@ -13,3 +13,17 @@ def start_rtsp_loopback(video_path: Path, stream_name: str, mediamtx_rtsp_url: s
         stderr=subprocess.DEVNULL,
     )
     return rtsp_url
+
+
+def get_video_duration_seconds(video_path: Path) -> float | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", str(video_path),
+            ],
+            capture_output=True, text=True, timeout=10, check=True,
+        )
+        return float(result.stdout.strip())
+    except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError):
+        return None
