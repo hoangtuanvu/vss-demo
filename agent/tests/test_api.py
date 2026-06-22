@@ -117,7 +117,7 @@ def test_upload_starts_rtsp_loopback_and_registers_alert_rules(session_factory, 
     app = make_test_app(session_factory, tmp_path, vss_client=vss_client)
     with TestClient(app) as client:
         response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
-    assert response.json() == {"stream_url": "rtsp://localhost:8554/clip"}
+    assert response.json() == {"stream_url": "rtsp://localhost:8554/clip", "filename": "clip.mp4"}
     assert len(vss_client.registered_calls) == 1
     stream_url, sensor_id, rules = vss_client.registered_calls[0]
     assert stream_url == "rtsp://localhost:8554/clip"
@@ -160,7 +160,7 @@ def test_upload_succeeds_even_when_register_alert_rules_fails(session_factory, t
     with TestClient(app) as client:
         response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
     assert response.status_code == 200
-    assert response.json() == {"stream_url": "rtsp://localhost:8554/clip"}
+    assert response.json() == {"stream_url": "rtsp://localhost:8554/clip", "filename": "clip.mp4"}
 
 
 def test_upload_returns_503_when_vss_unreachable(session_factory, tmp_path):
@@ -219,3 +219,53 @@ async def test_alerts_stream_endpoint_returns_event_stream_headers(session_facto
             await task
         except asyncio.CancelledError:
             pass
+
+
+def test_upload_response_includes_filename(session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
+    monkeypatch.setattr("app.main.get_video_duration_seconds", lambda path: 15.0)
+    app = make_test_app(session_factory, tmp_path)
+    with TestClient(app) as client:
+        response = client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
+    assert response.json()["filename"] == "clip.mp4"
+
+
+def test_upload_populates_active_upload_state(session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.main.start_rtsp_loopback", lambda path, name, url: f"{url}/{name}")
+    monkeypatch.setattr("app.main.get_video_duration_seconds", lambda path: 15.0)
+    deps = AppDependencies(
+        session_factory=session_factory, triage_graph=None, chat_graph=FakeChatGraph(),
+        vss_client=FakeVSSClient(), broadcaster=IncidentBroadcaster(), upload_dir=tmp_path,
+        mediamtx_rtsp_url="rtsp://localhost:8554", poll_interval_seconds=9999,
+        upload_state=ActiveUploadState(),
+    )
+    app = create_app(deps)
+    with TestClient(app) as client:
+        client.post("/upload", files={"file": ("clip.mp4", b"fake-bytes", "video/mp4")})
+    assert deps.upload_state.filename == "clip.mp4"
+    assert deps.upload_state.duration_seconds == 15.0
+    assert deps.upload_state.stream_start_at is not None
+
+
+def test_get_uploaded_file_returns_bytes(session_factory, tmp_path):
+    (tmp_path / "clip.mp4").write_bytes(b"fake-video-bytes")
+    app = make_test_app(session_factory, tmp_path)
+    with TestClient(app) as client:
+        response = client.get("/uploads/clip.mp4")
+    assert response.status_code == 200
+    assert response.content == b"fake-video-bytes"
+
+
+def test_get_uploaded_file_404_for_missing_file(session_factory, tmp_path):
+    app = make_test_app(session_factory, tmp_path)
+    with TestClient(app) as client:
+        response = client.get("/uploads/missing.mp4")
+    assert response.status_code == 404
+
+
+def test_get_uploaded_file_rejects_path_traversal(session_factory, tmp_path):
+    (tmp_path / "secret.txt").write_bytes(b"top secret")
+    app = make_test_app(session_factory, tmp_path)
+    with TestClient(app) as client:
+        response = client.get("/uploads/..%2F..%2Fsecret.txt")
+    assert response.status_code == 404

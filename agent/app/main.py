@@ -3,10 +3,12 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app import store
@@ -14,7 +16,7 @@ from app.alert_rules import HAZARD_ALERT_RULES
 from app.events import IncidentBroadcaster
 from app.models import Severity, incident_to_dict
 from app.poller import poll_loop
-from app.streaming import start_rtsp_loopback
+from app.streaming import get_video_duration_seconds, start_rtsp_loopback
 from app.upload_state import ActiveUploadState
 
 logger = logging.getLogger(__name__)
@@ -85,6 +87,9 @@ def create_app(deps: AppDependencies) -> FastAPI:
             raise HTTPException(status_code=502, detail="Failed to start video stream ingestion")
 
         deps.active_sensor_id = dest.stem
+        deps.upload_state.filename = dest.name
+        deps.upload_state.stream_start_at = datetime.utcnow()
+        deps.upload_state.duration_seconds = get_video_duration_seconds(dest)
 
         if deps.active_rule_ids:
             try:
@@ -99,7 +104,15 @@ def create_app(deps: AppDependencies) -> FastAPI:
         except Exception:
             logger.warning("Failed to register alert rules for stream %s", stream_url)
 
-        return {"stream_url": stream_url}
+        return {"stream_url": stream_url, "filename": dest.name}
+
+    @app.get("/uploads/{filename}")
+    def get_uploaded_file(filename: str):
+        safe_name = Path(filename).name
+        path = deps.upload_dir / safe_name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="file not found")
+        return FileResponse(path)
 
     @app.get("/incidents")
     def list_incidents_route():
