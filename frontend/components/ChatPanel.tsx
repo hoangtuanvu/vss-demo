@@ -9,21 +9,39 @@ interface Message {
   text: string;
 }
 
+const QUICK_ACTIONS: { label: string; prompt: string }[] = [
+  { label: "Summarize today", prompt: "Summarize today's incidents." },
+  { label: "Search: forklift", prompt: "Search the archive for forklift proximity incidents." },
+  { label: "Search: spill", prompt: "Search the archive for spill incidents." },
+];
+
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
-  async function handleSend() {
-    if (!input.trim()) return;
-    const userMessage: Message = { role: "user", text: input };
+  async function sendMessage(text: string) {
+    if (!text.trim()) return;
+    const userMessage: Message = { role: "user", text };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    const result = await sendChatMessage(userMessage.text);
+    const result = await sendChatMessage(text);
     setMessages((prev) => [...prev, { role: "assistant", text: result.answer }]);
   }
 
   return (
     <div className="mt-3 flex flex-col">
+      <div className="mb-2 flex flex-wrap gap-2">
+        {QUICK_ACTIONS.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={() => sendMessage(action.prompt)}
+            className="border border-paper/20 px-2 py-1 font-mono text-xs uppercase tracking-widest text-paper/60 hover:border-caution hover:text-caution"
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
       <ul data-testid="chat-history" className="flex max-h-64 flex-col gap-2 overflow-y-auto text-sm">
         {messages.length === 0 && (
           <li className="text-paper/40">Ask about a hazard, a zone, or how to prevent the next one.</li>
@@ -52,7 +70,7 @@ export default function ChatPanel() {
           className="flex-1 border border-paper/20 bg-ink px-3 py-2 text-sm text-paper outline-none focus-visible:border-caution"
         />
         <button
-          onClick={handleSend}
+          onClick={() => sendMessage(input)}
           className="border border-caution px-4 py-2 font-mono text-xs uppercase tracking-widest text-caution transition-colors hover:bg-caution hover:text-ink"
         >
           Send

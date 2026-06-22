@@ -45,4 +45,16 @@ describe("ChatPanel", () => {
       expect(history.querySelector("strong")).toBeNull();
     });
   });
+
+  it("sends a canned prompt when a quick-action chip is clicked", async () => {
+    (sendChatMessage as any).mockResolvedValue({ answer: "Mock summary." });
+    render(<ChatPanel />);
+
+    fireEvent.click(screen.getByText("Summarize today"));
+
+    await waitFor(() => {
+      expect(sendChatMessage).toHaveBeenCalledWith("Summarize today's incidents.");
+      expect(screen.getByTestId("chat-history").textContent).toContain("Mock summary.");
+    });
+  });
 });
