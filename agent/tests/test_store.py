@@ -76,3 +76,23 @@ def test_list_recent_incidents_by_hazard(session_factory):
         )
         recent = store.list_recent_incidents_by_hazard(session, HazardType.FORKLIFT_PROXIMITY)
         assert len(recent) == 1
+
+
+def test_create_incident_stores_video_offset_seconds(session_factory):
+    with session_factory() as session:
+        incident = store.create_incident(
+            session, hazard_type=HazardType.PPE, severity=Severity.WARNING,
+            zone="dock-1", caption="no hard hat", raw_alert_payload={},
+            dedupe_key="ppe:dock-1", video_offset_seconds=12.5,
+        )
+        assert incident.video_offset_seconds == 12.5
+
+
+def test_create_incident_defaults_video_offset_seconds_to_none(session_factory):
+    with session_factory() as session:
+        incident = store.create_incident(
+            session, hazard_type=HazardType.PPE, severity=Severity.WARNING,
+            zone="dock-1", caption="no hard hat", raw_alert_payload={},
+            dedupe_key="ppe:dock-1",
+        )
+        assert incident.video_offset_seconds is None

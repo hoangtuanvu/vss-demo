@@ -8,11 +8,12 @@ from app.models import HazardType, Incident
 
 def create_incident(
     session: Session, *, hazard_type, severity, zone: str, caption: str,
-    raw_alert_payload: dict, dedupe_key: str,
+    raw_alert_payload: dict, dedupe_key: str, video_offset_seconds: float | None = None,
 ) -> Incident:
     incident = Incident(
         hazard_type=hazard_type, severity=severity, zone=zone, caption=caption,
         raw_alert_payload=raw_alert_payload, dedupe_key=dedupe_key,
+        video_offset_seconds=video_offset_seconds,
     )
     session.add(incident)
     session.commit()
