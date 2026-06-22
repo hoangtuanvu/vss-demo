@@ -11,6 +11,18 @@ Design rationale, architecture, and
 out-of-scope decisions: `docs/superpowers/specs/2026-06-19-warehouse-safety-monitor-design.md`.
 Implementation plans: `docs/superpowers/plans/`.
 
+## Demo
+
+Mock-mode walkthrough (no GPU/NIM key needed — `VSS_MODE=mock`):
+
+| | |
+|---|---|
+| Dashboard, before any clip is uploaded | ![empty dashboard](docs/assets/01-dashboard-empty.png) |
+| After upload — incidents streaming in via SSE, video preview playing, live shift-report stats | ![dashboard with incidents](docs/assets/02-dashboard-with-incidents.png) |
+| Clicking "Play clip" on an incident seeks the player to the moment it was detected | ![play clip seek](docs/assets/03-play-clip-seek.png) |
+| Incident detail page | ![incident detail](docs/assets/04-incident-detail.png) |
+| Chat quick-action chips ("Summarize today", "Search: …") hitting the agent's `/chat` | ![chat quick action](docs/assets/05-chat-quick-action.png) |
+
 ## Hazards detected
 
 PPE compliance, restricted-zone intrusion, forklift–pedestrian proximity,
@@ -53,7 +65,14 @@ instance — no auth in front (fine for a time-boxed demo, not production).
 Point the agent's env vars at `http://<brev-instance-ip>:8000` / `:9080`.
 
 Deploying/redeploying to Brev is billed GPU compute — confirm with the user
-before running any launch command. There's no committed step-by-step
+before running any launch command. Stop the instance when not actively
+demoing to avoid idle GPU billing:
+
+```bash
+brev stop vss-warehouse
+```
+
+There's no committed step-by-step
 `infra/brev_deploy.md` runbook yet; see
 `docs/superpowers/specs/2026-06-21-real-vss-integration-design.md` for the
 narrative of what was actually deployed.
