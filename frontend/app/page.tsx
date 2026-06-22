@@ -1,14 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import ChatPanel from "../components/ChatPanel";
 import IncidentFeed from "../components/IncidentFeed";
 import StatsSummary from "../components/StatsSummary";
 import UploadBar from "../components/UploadBar";
-import { Incident, fetchIncidents, subscribeToAlerts } from "../lib/api";
+import VideoPreview from "../components/VideoPreview";
+import { Incident, fetchIncidents, subscribeToAlerts, videoUrl } from "../lib/api";
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [activeFilename, setActiveFilename] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     fetchIncidents().then(setIncidents);
@@ -20,6 +23,13 @@ export default function Home() {
     });
     return () => source.close();
   }, []);
+
+  function handlePlayClip(offsetSeconds: number) {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = offsetSeconds;
+    video.play();
+  }
 
   return (
     <main className="min-h-screen">
@@ -37,11 +47,17 @@ export default function Home() {
         </div>
 
         <div className="mt-6">
-          <UploadBar />
+          <UploadBar onUploaded={setActiveFilename} />
         </div>
 
+        {activeFilename && (
+          <div className="mt-6">
+            <VideoPreview ref={videoRef} src={videoUrl(activeFilename)} />
+          </div>
+        )}
+
         <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_1fr]">
-          <IncidentFeed incidents={incidents} />
+          <IncidentFeed incidents={incidents} onPlayClip={handlePlayClip} />
           <aside className="space-y-8">
             <div className="border border-paper/15 bg-panel p-4">
               <p className="font-mono text-xs uppercase tracking-widest text-paper/50">Ask the floor</p>

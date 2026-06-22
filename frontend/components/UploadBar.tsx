@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { uploadVideo } from "../lib/api";
 
-export default function UploadBar() {
+export default function UploadBar({ onUploaded }: { onUploaded?: (filename: string) => void }) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +16,7 @@ export default function UploadBar() {
       const result = await uploadVideo(file);
       setStatus(`Streaming at ${result.stream_url}`);
       setError(null);
+      onUploaded?.(result.filename);
     } catch {
       setError("Upload failed. Try again.");
       setStatus(null);
