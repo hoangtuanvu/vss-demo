@@ -8,16 +8,21 @@ export interface Incident {
   zone: string;
   caption: string;
   report_text: string | null;
+  video_offset_seconds: number | null;
   created_at: string;
   updated_at: string;
 }
 
-export async function uploadVideo(file: File): Promise<{ stream_url: string }> {
+export async function uploadVideo(file: File): Promise<{ stream_url: string; filename: string }> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await fetch(`${API_BASE_URL}/upload`, { method: "POST", body: formData });
   if (!res.ok) throw new Error("upload failed");
   return res.json();
+}
+
+export function videoUrl(filename: string): string {
+  return `${API_BASE_URL}/uploads/${filename}`;
 }
 
 export async function fetchIncidents(): Promise<Incident[]> {
