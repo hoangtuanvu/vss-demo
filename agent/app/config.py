@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,8 +9,10 @@ class Settings(BaseSettings):
     nvidia_api_key: str = ""
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
     llm_model_name: str = "nvidia/nvidia-nemotron-nano-9b-v2"
+    vss_mode: Literal["real", "mock"] = "real"
     vss_agent_base_url: str = "http://localhost:8000"
     vss_alert_bridge_base_url: str = "http://localhost:9080"
+    mock_vss_base_url: str = "http://localhost:9000"
     database_url: str = "sqlite:///./warehouse.db"
     slack_webhook_url: str = ""
     poll_interval_seconds: int = 8
