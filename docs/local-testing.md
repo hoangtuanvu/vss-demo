@@ -21,9 +21,14 @@ Check it's up: `curl localhost:8000/health` → `{"status":"ok"}`.
 ## 1a. Test against the mock VSS
 
 `infra/mock_vss.py` is a stdlib-only fake implementing every endpoint
-`VSSClient` calls (`/health`, `/alerts`, `/ask-video`, `/query-analytics`,
-`/search-archive`, `/generate-report`). It returns 5 canned hazard alerts
-(one per type) and generic mock answers — enough to drive the full
+`VSSClient` calls:
+- `GET /health`
+- `GET /api/v1/realtime/incidents?start_time=&limit=`
+- `POST /chat`
+- `POST /api/v1/realtime`
+- `DELETE /api/v1/realtime/{id}`
+
+It returns 5 canned hazard incidents and generic mock answers — enough to drive the full
 poll → triage → persist → SSE → chat pipeline with no GPU, no NIM key, no
 real footage.
 
@@ -37,7 +42,7 @@ python3 infra/mock_vss.py
 Point the agent at it and restart just that service:
 
 ```bash
-VSS_BASE_URL=http://host.docker.internal:9000 docker compose up -d agent
+VSS_MODE=mock MOCK_VSS_BASE_URL=http://host.docker.internal:9000 docker compose up -d agent
 ```
 
 **Limitation:** `classify_severity` calls the real NVIDIA NIM endpoint. With
@@ -47,9 +52,9 @@ To see real critical/warning/info classification, set `NVIDIA_API_KEY` in
 the `agent` environment even while using the mock VSS — NIM and VSS are
 independent.
 
-To make the mock emit a *new* alert while a page is already watching the
+To make the mock emit a *new* incident while a page is already watching the
 dashboard at `/` (to prove SSE is live, not historical), append an entry to the
-`ALERTS` list in `infra/mock_vss.py` with the next `cursor` value and restart
+`INCIDENTS` list in `infra/mock_vss.py` with the next `id` value and restart
 the script — the next poll cycle (`POLL_INTERVAL_SECONDS`, default 8s) picks
 it up.
 
