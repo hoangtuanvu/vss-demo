@@ -21,11 +21,23 @@ services:
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-8}
       DEDUPE_WINDOW_SECONDS: ${DEDUPE_WINDOW_SECONDS:-300}
       MEDIAMTX_RTSP_URL: rtsp://mediamtx:8554
+      VSS_MODE: ${VSS_MODE:-real}
+      MOCK_VSS_BASE_URL: ${MOCK_VSS_BASE_URL:-http://mock-vss:9000}
     volumes:
       - agent-data:/app/data
       - agent-uploads:/app/uploads
     depends_on:
       - mediamtx
+
+  mock-vss:
+    image: python:3.12-slim
+    profiles: ["mock"]
+    working_dir: /app
+    volumes:
+      - ./infra:/app/infra:ro
+    command: ["python3", "infra/mock_vss.py"]
+    ports:
+      - "9000:9000"
 
   frontend:
     build:
