@@ -18,7 +18,13 @@ def build_app(settings: Settings) -> tuple[FastAPI, AppDependencies]:
     Base.metadata.create_all(engine)
     session_factory = make_session_factory(engine)
     llm = get_chat_model(settings)
-    vss_client = VSSClient(settings.vss_agent_base_url, settings.vss_alert_bridge_base_url)
+    if settings.vss_mode == "mock":
+        agent_base_url = settings.mock_vss_base_url
+        alert_bridge_base_url = settings.mock_vss_base_url
+    else:
+        agent_base_url = settings.vss_agent_base_url
+        alert_bridge_base_url = settings.vss_alert_bridge_base_url
+    vss_client = VSSClient(agent_base_url, alert_bridge_base_url)
     triage_graph = build_triage_graph(
         llm, vss_client, session_factory, settings.slack_webhook_url,
         settings.dedupe_window_seconds, broadcaster,
