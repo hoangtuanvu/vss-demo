@@ -1,6 +1,7 @@
 # vss-demo — Warehouse Safety Monitor
 
-Agentic warehouse safety monitor built on NVIDIA's VSS `warehouse` blueprint
+Agentic warehouse safety monitor built on NVIDIA's
+[VSS `warehouse` blueprint](https://build.nvidia.com/nvidia/video-search-and-summarization/blueprintcard)
 + LangGraph. Takes an uploaded video, replays it as a simulated live camera
 feed, watches it for 5 hazard types, triages/dedupes detections, escalates
 critical incidents (Slack/webhook), drafts incident reports, and answers
@@ -35,9 +36,10 @@ its own Elasticsearch/analytics stack. See the design doc for why.
 
 ### VSS deployment (Brev)
 
-Real VSS runs as its own NVIDIA Brev GPU instance (`vss-warehouse`, 2×A6000),
-deployed via the `vss-deploy-profile` NVIDIA Agent Skill with the
-`warehouse` profile + an NGC API key. Two services on that box, hit directly
+Real VSS runs as its own [NVIDIA Brev](https://brev.nvidia.com) GPU instance
+(`vss-warehouse`, 2×A6000), deployed via the `vss-deploy-profile` skill from
+[nvidia/skills](https://github.com/nvidia/skills) with the `warehouse`
+profile + an NGC API key. Two services on that box, hit directly
 by IP (not behind Brev's HAProxy):
 
 - `vss-agent`, port `8000` — `POST /chat` (drives ask-video / report
