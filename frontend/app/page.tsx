@@ -52,7 +52,7 @@ export default function Home() {
 
         {activeFilename && (
           <div className="mt-6">
-            <VideoPreview ref={videoRef} src={videoUrl(activeFilename)} />
+            <VideoPreview ref={videoRef} key={activeFilename} src={videoUrl(activeFilename)} />
           </div>
         )}
 
