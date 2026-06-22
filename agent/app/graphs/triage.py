@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Callable, TypedDict
 
 from app import store
@@ -61,8 +62,13 @@ def make_dedupe_node(session_factory, window_seconds: int) -> Callable[[dict], d
     return dedupe
 
 
-def make_persist_incident_node(session_factory, broadcaster) -> Callable[[dict], dict]:
+def make_persist_incident_node(session_factory, broadcaster, upload_state) -> Callable[[dict], dict]:
     def persist_incident(state: dict) -> dict:
+        video_offset_seconds = None
+        if upload_state.stream_start_at is not None and upload_state.duration_seconds:
+            elapsed = (datetime.utcnow() - upload_state.stream_start_at).total_seconds()
+            video_offset_seconds = elapsed % upload_state.duration_seconds
+
         with session_factory() as session:
             if state["is_new"]:
                 incident = store.create_incident(
@@ -73,6 +79,7 @@ def make_persist_incident_node(session_factory, broadcaster) -> Callable[[dict],
                     caption=state["caption"],
                     raw_alert_payload=state["alert"],
                     dedupe_key=state["dedupe_key"],
+                    video_offset_seconds=video_offset_seconds,
                 )
             else:
                 incident = store.update_incident(
@@ -142,11 +149,11 @@ def route_by_severity(state: dict) -> Literal["critical", "end"]:
     return "critical" if state["severity"] == Severity.CRITICAL.value else "end"
 
 
-def build_triage_graph(llm, vss_client, session_factory, webhook_url: str, dedupe_window_seconds: int, broadcaster):
+def build_triage_graph(llm, vss_client, session_factory, webhook_url: str, dedupe_window_seconds: int, broadcaster, upload_state):
     graph = StateGraph(TriageState)
     graph.add_node("classify_severity", make_classify_severity_node(llm))
     graph.add_node("dedupe", make_dedupe_node(session_factory, dedupe_window_seconds))
-    graph.add_node("persist_incident", make_persist_incident_node(session_factory, broadcaster))
+    graph.add_node("persist_incident", make_persist_incident_node(session_factory, broadcaster, upload_state))
     graph.add_node("generate_report", make_generate_report_node(vss_client, session_factory))
     graph.add_node("escalate_notify", make_escalate_notify_node(webhook_url, session_factory))
     graph.set_entry_point("classify_severity")

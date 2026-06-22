@@ -1,12 +1,13 @@
 from app.events import IncidentBroadcaster
 from app.graphs.triage import make_persist_incident_node
 from app.models import HazardType, Severity
+from app.upload_state import ActiveUploadState
 
 
 def test_persist_incident_creates_new_and_publishes(session_factory):
     broadcaster = IncidentBroadcaster()
     queue = broadcaster.subscribe()
-    node = make_persist_incident_node(session_factory, broadcaster)
+    node = make_persist_incident_node(session_factory, broadcaster, ActiveUploadState())
 
     result = node({
         "is_new": True, "incident_id": None, "hazard_type": "ppe", "zone": "dock-1",
@@ -29,7 +30,7 @@ def test_persist_incident_updates_existing(session_factory):
         existing_id = existing.id
 
     broadcaster = IncidentBroadcaster()
-    node = make_persist_incident_node(session_factory, broadcaster)
+    node = make_persist_incident_node(session_factory, broadcaster, ActiveUploadState())
     result = node({
         "is_new": False, "incident_id": existing_id, "hazard_type": "ppe", "zone": "dock-1",
         "caption": "still no hard hat", "severity": "critical", "alert": {}, "dedupe_key": "ppe:dock-1",

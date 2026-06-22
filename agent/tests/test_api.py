@@ -6,6 +6,7 @@ from app import store
 from app.events import IncidentBroadcaster
 from app.main import AppDependencies, create_app
 from app.models import HazardType, Severity
+from app.upload_state import ActiveUploadState
 
 
 class FakeVSSClient:
@@ -48,6 +49,7 @@ def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None, 
         broadcaster=broadcaster or IncidentBroadcaster(),
         upload_dir=tmp_path,
         mediamtx_rtsp_url="rtsp://localhost:8554",
+        upload_state=ActiveUploadState(),
         poll_interval_seconds=9999,
     )
     return create_app(deps)

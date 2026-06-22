@@ -15,6 +15,7 @@ from app.events import IncidentBroadcaster
 from app.models import Severity, incident_to_dict
 from app.poller import poll_loop
 from app.streaming import start_rtsp_loopback
+from app.upload_state import ActiveUploadState
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class AppDependencies:
     broadcaster: IncidentBroadcaster
     upload_dir: Path
     mediamtx_rtsp_url: str
+    upload_state: ActiveUploadState
     poll_interval_seconds: int = 8
     active_rule_ids: list[str] = field(default_factory=list)
     active_sensor_id: str | None = None

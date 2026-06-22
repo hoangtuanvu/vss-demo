@@ -1,5 +1,6 @@
 from app.events import IncidentBroadcaster
 from app.graphs.triage import build_triage_graph
+from app.upload_state import ActiveUploadState
 from app import store
 
 
@@ -40,6 +41,7 @@ def test_triage_graph_handles_one_fixture_per_hazard(session_factory, monkeypatc
     graph = build_triage_graph(
         llm, FakeVSSClient(), session_factory, "https://hooks.example/webhook",
         dedupe_window_seconds=300, broadcaster=IncidentBroadcaster(),
+        upload_state=ActiveUploadState(),
     )
 
     for hazard_type, zone, caption, expected_severity in fixtures:
