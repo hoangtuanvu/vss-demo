@@ -8,3 +8,9 @@ __pycache__/
 *.pyc
 .DS_Store
 .superpowers/
+
+# docs
+docs/superpowers/
+
+# claude
+.claude/

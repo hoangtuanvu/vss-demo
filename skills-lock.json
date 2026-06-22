@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "vss-deploy-profile": {
+      "source": "nvidia/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vss-deploy-profile/SKILL.md",
+      "computedHash": "6f57fc00f470390cd74599ad0ccc654958d613cb0f41039a2fb51cb1725c8db6"
+    },
+    "vss-manage-alerts": {
+      "source": "nvidia/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vss-manage-alerts/SKILL.md",
+      "computedHash": "790cc9146e1eeeb144b42ab3fe8c3e9997225b7be47c0cd3c991d9562657142e"
+    }
+  }
+}
