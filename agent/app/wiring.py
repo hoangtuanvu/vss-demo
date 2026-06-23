@@ -31,7 +31,7 @@ def build_app(settings: Settings) -> tuple[FastAPI, AppDependencies]:
         llm, vss_client, session_factory, settings.slack_webhook_url,
         settings.dedupe_window_seconds, broadcaster, upload_state,
     )
-    chat_graph = build_chat_graph(vss_client)
+    chat_graph = build_chat_graph(llm, vss_client, session_factory)
     deps = AppDependencies(
         session_factory=session_factory,
         triage_graph=triage_graph,
