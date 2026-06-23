@@ -44,7 +44,9 @@ async def poll_loop(vss_client, compiled_graph, session_factory, interval_second
     since_timestamp = None
     while not stop_event.is_set():
         try:
-            since_timestamp = run_poll_iteration(vss_client, compiled_graph, since_timestamp, session_factory)
+            since_timestamp = await asyncio.to_thread(
+                run_poll_iteration, vss_client, compiled_graph, since_timestamp, session_factory
+            )
         except Exception:
             logger.exception("Poll iteration failed, will retry next interval")
         await asyncio.sleep(interval_seconds)

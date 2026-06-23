@@ -1,8 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
 from typing import Callable, TypedDict
 
 from app import store
 from app.models import HazardType, Severity, incident_to_dict
+
+CLASSIFY_SEVERITY_TIMEOUT_SECONDS = 15.0
 
 
 class TriageState(TypedDict):
@@ -39,10 +42,14 @@ def make_classify_severity_node(llm) -> Callable[[dict], dict]:
             caption=state["caption"],
             history=state["history"],
         )
+        executor = ThreadPoolExecutor(max_workers=1)
         try:
-            text = llm.invoke(prompt).content.strip().lower()
-        except Exception:
+            future = executor.submit(llm.invoke, prompt)
+            text = future.result(timeout=CLASSIFY_SEVERITY_TIMEOUT_SECONDS).content.strip().lower()
+        except (Exception, FutureTimeoutError):
             return {"severity": Severity.WARNING.value}
+        finally:
+            executor.shutdown(wait=False)
         if text not in VALID_SEVERITIES:
             return {"severity": Severity.WARNING.value}
         return {"severity": text}

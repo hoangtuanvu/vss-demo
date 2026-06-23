@@ -14,3 +14,6 @@ docs/superpowers/
 
 # claude
 .claude/
+
+# env
+.env
