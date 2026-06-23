@@ -11,12 +11,18 @@ from urllib.parse import urlparse, parse_qs
 
 BASE_TIME = datetime(2026, 1, 1, 0, 0, 0)
 
+# Covers all 5 hazard types so the offline demo feed matches the "5 hazards,
+# full scope" scope. c1-c3 use VSS's human-readable category names that
+# app.vss_client.CATEGORY_MAP translates; c4-c5 emit the canonical HazardType
+# values directly (zone_intrusion/fall), exercising the poller's unmapped
+# passthrough path. The real warehouse blueprint's exact category strings for
+# zone-intrusion and fall are unconfirmed — see CATEGORY_MAP's TODO.
 INCIDENTS = [
     {"id": "c1", "category": "PPE Violation", "sensor_id": "dock-1", "timestamp": (BASE_TIME).isoformat() + "Z", "description": "Worker without a hard hat near the loading dock"},
     {"id": "c2", "category": "Near Miss Violation", "sensor_id": "aisle-2", "timestamp": (BASE_TIME + timedelta(seconds=10)).isoformat() + "Z", "description": "Forklift within 2m of a pedestrian"},
     {"id": "c3", "category": "Pathway Obstruction Violation", "sensor_id": "aisle-1", "timestamp": (BASE_TIME + timedelta(seconds=20)).isoformat() + "Z", "description": "Liquid spill blocking the walkway"},
-    {"id": "c4", "category": "Spillover Violation", "sensor_id": "aisle-3", "timestamp": (BASE_TIME + timedelta(seconds=30)).isoformat() + "Z", "description": "Dropped pallet blocking the walkway"},
-    {"id": "c5", "category": "PPE Violation", "sensor_id": "restricted-a", "timestamp": (BASE_TIME + timedelta(seconds=40)).isoformat() + "Z", "description": "Person entered the marked restricted zone without a vest"},
+    {"id": "c4", "category": "zone_intrusion", "sensor_id": "restricted-a", "timestamp": (BASE_TIME + timedelta(seconds=30)).isoformat() + "Z", "description": "Person entered the marked restricted zone without authorization"},
+    {"id": "c5", "category": "fall", "sensor_id": "aisle-3", "timestamp": (BASE_TIME + timedelta(seconds=40)).isoformat() + "Z", "description": "Worker on the ground and not moving — possible fall"},
 ]
 
 

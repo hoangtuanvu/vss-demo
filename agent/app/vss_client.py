@@ -8,7 +8,16 @@ from app.chat_format import clean_chat_response
 # names (observed live against the deployed warehouse-blueprint sample
 # dataset), not our HazardType enum values. Map known categories here;
 # anything absent passes through unmapped and is dropped by the poller's
-# existing unrecognized-category skip (see app/poller.py).
+# existing unrecognized-category skip (see app/poller.py) UNLESS it already
+# equals a HazardType value (e.g. "zone_intrusion"/"fall").
+#
+# TODO(real-vss): only the 4 categories below were observed live; the
+# restricted-zone and fall rules never fired against the sample dataset, so
+# the real category strings VSS emits for them are unconfirmed. Until verified
+# against the live Brev instance and added here, zone_intrusion and fall
+# incidents from real VSS are silently dropped — only 3 of the 5 registered
+# hazards surface. (The mock server emits the canonical values directly, so
+# all 5 appear in offline demos.)
 CATEGORY_MAP = {
     "ppe violation": "ppe",
     "spillover violation": "spill",

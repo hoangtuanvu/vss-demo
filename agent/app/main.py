@@ -135,7 +135,7 @@ def create_app(deps: AppDependencies) -> FastAPI:
         message = payload["message"]
         if deps.active_sensor_id:
             message = f"For camera/sensor '{deps.active_sensor_id}': {message}"
-        result = deps.chat_graph.invoke({"message": message, "answer": None})
+        result = deps.chat_graph.invoke({"message": message, "intent": None, "answer": None})
         return {"answer": result["answer"]}
 
     @app.get("/alerts/stream")
