@@ -17,9 +17,6 @@ class FakeVSSClient:
     def get_new_alerts(self, since_timestamp):
         return []
 
-    def generate_report(self, incident):
-        return "generated report"
-
     def health_check(self):
         return True
 
@@ -31,6 +28,13 @@ class FakeVSSClient:
         self.deleted_calls.append(rule_ids)
 
 
+class FakeLLM:
+    def invoke(self, prompt):
+        class Msg:
+            content = "generated report"
+        return Msg()
+
+
 class FakeChatGraph:
     def __init__(self):
         self.invocations = []
@@ -40,7 +44,7 @@ class FakeChatGraph:
         return {"answer": "the chat answer"}
 
 
-def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None, chat_graph=None):
+def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None, chat_graph=None, llm=None):
     deps = AppDependencies(
         session_factory=session_factory,
         triage_graph=None,
@@ -51,6 +55,7 @@ def make_test_app(session_factory, tmp_path, broadcaster=None, vss_client=None, 
         mediamtx_rtsp_url="rtsp://localhost:8554",
         upload_state=ActiveUploadState(),
         poll_interval_seconds=9999,
+        llm=llm or FakeLLM(),
     )
     return create_app(deps)
 
@@ -143,9 +148,8 @@ def test_chat_includes_active_sensor_context_after_upload(session_factory, tmp_p
     with TestClient(app) as client:
         client.post("/upload", files={"file": ("forklift_proximity.mp4", b"fake-bytes", "video/mp4")})
         client.post("/chat", json={"message": "how many incidents today?"})
-    assert chat_graph.invocations[0]["message"] == (
-        "For camera/sensor 'forklift_proximity': how many incidents today?"
-    )
+    assert chat_graph.invocations[0]["message"] == "how many incidents today?"
+    assert chat_graph.invocations[0]["sensor_id"] == "forklift_proximity"
 
 
 def test_upload_succeeds_even_when_register_alert_rules_fails(session_factory, tmp_path, monkeypatch):

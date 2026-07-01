@@ -25,7 +25,7 @@ def run_poll_iteration(vss_client, compiled_graph, since_timestamp, session_fact
         initial_state = {
             "alert": alert,
             "hazard_type": alert["category"],
-            "zone": alert["sensor_id"],
+            "zone": vss_client.resolve_sensor_id(alert["sensor_id"]),
             "caption": alert.get("description", ""),
             "history": history,
             "severity": None,

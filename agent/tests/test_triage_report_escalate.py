@@ -3,14 +3,16 @@ from app.graphs.triage import make_escalate_notify_node, make_generate_report_no
 from app.models import HazardType, Severity
 
 
-class FakeVSSClient:
-    def __init__(self, report_text="Incident report"):
-        self.report_text = report_text
-        self.calls = []
+class FakeLLM:
+    def __init__(self, content="Incident report"):
+        self.content = content
 
-    def generate_report(self, incident):
-        self.calls.append(incident)
-        return self.report_text
+    def invoke(self, prompt):
+        class Msg:
+            pass
+        msg = Msg()
+        msg.content = self.content
+        return msg
 
 
 def _seed_incident(session_factory):
@@ -22,18 +24,14 @@ def _seed_incident(session_factory):
         return incident.id
 
 
-def test_generate_report_calls_vss_client_with_incident_dict_and_persists(session_factory):
+def test_generate_report_uses_llm_and_persists(session_factory):
     incident_id = _seed_incident(session_factory)
-    vss_client = FakeVSSClient(report_text="Person down in aisle-3 at 10:02.")
-    node = make_generate_report_node(vss_client, session_factory)
+    llm = FakeLLM(content="Person down in aisle-3 at 10:02.")
+    node = make_generate_report_node(llm, session_factory)
 
     result = node({"incident_id": incident_id})
 
     assert result == {"report_text": "Person down in aisle-3 at 10:02."}
-    assert vss_client.calls[0]["id"] == incident_id
-    assert vss_client.calls[0]["hazard_type"] == "fall"
-    assert vss_client.calls[0]["zone"] == "aisle-3"
-    assert vss_client.calls[0]["caption"] == "person down"
     with session_factory() as session:
         assert store.get_incident(session, incident_id).report_text == "Person down in aisle-3 at 10:02."
 

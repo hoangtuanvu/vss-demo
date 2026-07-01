@@ -32,6 +32,8 @@ class AppDependencies:
     upload_dir: Path
     mediamtx_rtsp_url: str
     upload_state: ActiveUploadState
+    llm: object = None
+    public_rtsp_base_url: str = ""
     poll_interval_seconds: int = 8
     active_rule_ids: list[str] = field(default_factory=list)
     active_sensor_id: str | None = None
@@ -52,6 +54,12 @@ def create_app(deps: AppDependencies) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        try:
+            deleted = deps.vss_client.delete_all_alert_rules()
+            if deleted:
+                logger.warning("Startup: deleted %d orphaned VSS alert rules", deleted)
+        except Exception as exc:
+            logger.warning("Startup: could not clean up VSS alert rules: %s", exc)
         poll_task = None
         if deps.triage_graph is not None:
             poll_task = asyncio.create_task(
@@ -86,6 +94,10 @@ def create_app(deps: AppDependencies) -> FastAPI:
         except Exception:
             raise HTTPException(status_code=502, detail="Failed to start video stream ingestion")
 
+        registration_url = (
+            f"{deps.public_rtsp_base_url}/{dest.stem}" if deps.public_rtsp_base_url else stream_url
+        )
+
         deps.active_sensor_id = dest.stem
         deps.upload_state.filename = dest.name
         deps.upload_state.stream_start_at = datetime.utcnow()
@@ -94,15 +106,16 @@ def create_app(deps: AppDependencies) -> FastAPI:
         if deps.active_rule_ids:
             try:
                 deps.vss_client.delete_alert_rules(deps.active_rule_ids)
-            except Exception:
-                logger.warning("Failed to delete previous alert rules: %s", deps.active_rule_ids)
+            except Exception as exc:
+                logger.debug("Could not delete previous alert rules (stale): %s", exc)
             deps.active_rule_ids = []
         try:
             deps.active_rule_ids = deps.vss_client.register_alert_rules(
-                stream_url, dest.stem, HAZARD_ALERT_RULES
+                registration_url, dest.stem, HAZARD_ALERT_RULES
             )
-        except Exception:
-            logger.warning("Failed to register alert rules for stream %s", stream_url)
+            logger.info("Registered %d alert rules for stream %s", len(deps.active_rule_ids), registration_url)
+        except Exception as exc:
+            logger.warning("Failed to register alert rules for stream %s: %s", registration_url, exc)
 
         return {"stream_url": stream_url, "filename": dest.name}
 
@@ -125,17 +138,33 @@ def create_app(deps: AppDependencies) -> FastAPI:
             incident = store.get_incident(session, incident_id)
             if incident is None:
                 raise HTTPException(status_code=404, detail="incident not found")
-            if incident.report_text is None and incident.severity == Severity.CRITICAL:
-                report_text = deps.vss_client.generate_report(incident_to_dict(incident))
+            if incident.report_text is None and incident.severity == Severity.CRITICAL and deps.llm:
+                incident_dict = incident_to_dict(incident)
+                prompt = (
+                    "Write a concise warehouse safety incident report.\n"
+                    f"Hazard type: {incident_dict['hazard_type']}\nSeverity: {incident_dict['severity']}\n"
+                    f"Zone: {incident_dict['zone']}\nDescription: {incident_dict['caption']}\n"
+                    f"Detected at: {incident_dict['created_at']}\nReport:"
+                )
+                try:
+                    report_text = deps.llm.invoke(prompt).content.strip()
+                except Exception:
+                    report_text = (
+                        f"Incident report: {incident_dict['hazard_type']} detected in "
+                        f"{incident_dict['zone']} at {incident_dict['created_at']}."
+                    )
                 incident = store.update_incident(session, incident.id, report_text=report_text)
             return incident_to_dict(incident)
 
     @app.post("/chat")
     def chat(payload: dict):
         message = payload["message"]
-        if deps.active_sensor_id:
-            message = f"For camera/sensor '{deps.active_sensor_id}': {message}"
-        result = deps.chat_graph.invoke({"message": message, "intent": None, "answer": None})
+        result = deps.chat_graph.invoke({
+            "message": message,
+            "intent": None,
+            "answer": None,
+            "sensor_id": deps.active_sensor_id,
+        })
         return {"answer": result["answer"]}
 
     @app.get("/alerts/stream")

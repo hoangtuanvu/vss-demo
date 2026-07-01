@@ -10,6 +10,9 @@ class FakeVSSClient:
         self.calls.append(since_timestamp)
         return self._batches.pop(0) if self._batches else []
 
+    def resolve_sensor_id(self, raw_sensor_id):
+        return raw_sensor_id
+
 
 class FakeGraph:
     def __init__(self):

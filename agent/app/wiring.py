@@ -28,7 +28,7 @@ def build_app(settings: Settings) -> tuple[FastAPI, AppDependencies]:
     vss_client = VSSClient(agent_base_url, alert_bridge_base_url)
     upload_state = ActiveUploadState()
     triage_graph = build_triage_graph(
-        llm, vss_client, session_factory, settings.slack_webhook_url,
+        llm, session_factory, settings.slack_webhook_url,
         settings.dedupe_window_seconds, broadcaster, upload_state,
     )
     chat_graph = build_chat_graph(llm, vss_client, session_factory)
@@ -40,7 +40,9 @@ def build_app(settings: Settings) -> tuple[FastAPI, AppDependencies]:
         broadcaster=broadcaster,
         upload_dir=Path("uploads"),
         mediamtx_rtsp_url=settings.mediamtx_rtsp_url,
+        public_rtsp_base_url=settings.public_rtsp_base_url,
         poll_interval_seconds=settings.poll_interval_seconds,
         upload_state=upload_state,
+        llm=llm,
     )
     return create_app(deps), deps

@@ -10,9 +10,11 @@ interface Message {
 }
 
 const QUICK_ACTIONS: { label: string; prompt: string }[] = [
-  { label: "Summarize today", prompt: "Summarize today's incidents." },
-  { label: "Search: forklift", prompt: "Search the archive for forklift proximity incidents." },
-  { label: "Search: spill", prompt: "Search the archive for spill incidents." },
+  { label: "Today's incidents", prompt: "Summarize today's incidents." },
+  { label: "Forklift alerts", prompt: "List all forklift proximity incidents with their zones and severity." },
+  { label: "Critical only", prompt: "Show all critical severity incidents." },
+  { label: "What's in video?", prompt: "What is currently happening in the video footage?" },
+  { label: "Prevent spills", prompt: "How can we prevent spill incidents? Suggest SOP improvements." },
 ];
 
 export default function ChatPanel() {

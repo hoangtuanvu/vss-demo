@@ -3,3 +3,4 @@ paths:
     source: publisher
 rtspAddress: :8554
 protocols: [tcp]
+readBufferCount: 4096

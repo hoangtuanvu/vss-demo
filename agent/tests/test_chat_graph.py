@@ -3,15 +3,24 @@ from app.models import HazardType, Severity
 from app.store import create_incident
 
 
-class FakeLLMIntent:
-    def __init__(self, intent):
-        self.intent = intent
+class FakeLLM:
+    """Returns responses from a queue; last entry is repeated if exhausted."""
+
+    def __init__(self, *responses):
+        self._responses = list(responses)
+        self._index = 0
 
     def invoke(self, prompt):
-        class R:
-            content = self.intent
+        idx = min(self._index, len(self._responses) - 1)
+        self._index += 1
+        content = self._responses[idx]
 
-        return R()
+        class R:
+            pass
+
+        r = R()
+        r.content = content
+        return r
 
 
 class FakeVSSClient:
@@ -24,25 +33,62 @@ class FakeVSSClient:
         return self.answer
 
 
-def test_chat_graph_forwards_general_question_and_returns_answer(session_factory):
-    vss_client = FakeVSSClient(answer="two people in frame")
-    graph = build_chat_graph(FakeLLMIntent("general"), vss_client, session_factory)
-    result = graph.invoke({"message": "who is in this clip?", "intent": None, "answer": None})
-    assert vss_client.messages_received == ["who is in this clip?"]
-    assert result["answer"] == "two people in frame"
+class ErrorVSSClient:
+    def chat(self, message):
+        raise RuntimeError("boom")
 
 
-def test_chat_graph_falls_back_gracefully_on_vss_client_error(session_factory):
-    class ErrorVSSClient:
-        def chat(self, message):
-            raise RuntimeError("boom")
+def test_incidents_query_uses_llm_not_vss(session_factory):
+    with session_factory() as session:
+        create_incident(
+            session,
+            hazard_type=HazardType.SPILL,
+            severity=Severity.WARNING,
+            zone="aisle-3",
+            caption="liquid spill near shelf",
+            raw_alert_payload={},
+            dedupe_key="spill:aisle-3:1",
+        )
 
-    graph = build_chat_graph(FakeLLMIntent("general"), ErrorVSSClient(), session_factory)
-    result = graph.invoke({"message": "who is in this clip?", "intent": None, "answer": None})
-    assert "couldn't fetch" in result["answer"]
+    vss_client = FakeVSSClient()
+    llm = FakeLLM("1 spill in aisle-3")
+    graph = build_chat_graph(llm, vss_client, session_factory)
+    result = graph.invoke({"message": "list all spill incidents", "intent": None, "answer": None})
+
+    assert result["answer"] == "1 spill in aisle-3"
+    assert vss_client.messages_received == []  # VSS never called
 
 
-def test_sop_suggestion_drafts_from_incident_history(session_factory):
+def test_video_question_calls_vss(session_factory):
+    vss_client = FakeVSSClient(answer="forklift moving near loading dock")
+    llm = FakeLLM("video_question")
+    graph = build_chat_graph(llm, vss_client, session_factory)
+    result = graph.invoke({"message": "what is happening?", "intent": None, "answer": None})
+
+    assert vss_client.messages_received == ["what is happening?"]
+    assert result["answer"] == "forklift moving near loading dock"
+
+
+def test_video_question_vss_error_returns_helpful_message(session_factory):
+    llm = FakeLLM("video_question")
+    graph = build_chat_graph(llm, ErrorVSSClient(), session_factory)
+    result = graph.invoke({"message": "what is happening?", "intent": None, "answer": None})
+
+    assert "upload" in result["answer"].lower() or "stream" in result["answer"].lower()
+
+
+def test_video_question_vss_sorry_response_is_replaced(session_factory):
+    vss_client = FakeVSSClient(
+        answer="Sorry, I wasn't able to complete your request. Please try again."
+    )
+    llm = FakeLLM("video_question")
+    graph = build_chat_graph(llm, vss_client, session_factory)
+    result = graph.invoke({"message": "what is in the video?", "intent": None, "answer": None})
+
+    assert "sorry" not in result["answer"].lower() or "upload" in result["answer"].lower()
+
+
+def test_sop_suggestion_uses_llm_with_incident_history(session_factory):
     with session_factory() as session:
         create_incident(
             session,
@@ -54,33 +100,40 @@ def test_sop_suggestion_drafts_from_incident_history(session_factory):
             dedupe_key="forklift_proximity:dock-1:1",
         )
 
-    vss_client = FakeVSSClient(answer="Add a marked pedestrian lane near dock-1.")
-    graph = build_chat_graph(FakeLLMIntent("sop_suggestion"), vss_client, session_factory)
+    vss_client = FakeVSSClient()
+    llm = FakeLLM("Add pedestrian lanes near dock-1.")
+    graph = build_chat_graph(llm, vss_client, session_factory)
     result = graph.invoke(
         {"message": "how do we prevent forklift incidents?", "intent": None, "answer": None}
     )
 
-    assert result["answer"] == "Add a marked pedestrian lane near dock-1."
-    assert len(vss_client.messages_received) == 1
-    assert "forklift passed within 1m of a pedestrian" in vss_client.messages_received[0]
-    assert "how do we prevent forklift incidents?" in vss_client.messages_received[0]
+    assert result["answer"] == "Add pedestrian lanes near dock-1."
+    assert vss_client.messages_received == []  # VSS never called
 
 
-def test_sop_suggestion_falls_back_gracefully_on_vss_client_error(session_factory):
-    class ErrorVSSClient:
-        def chat(self, message):
-            raise RuntimeError("boom")
-
-    graph = build_chat_graph(FakeLLMIntent("sop_suggestion"), ErrorVSSClient(), session_factory)
-    result = graph.invoke(
-        {"message": "how do we prevent forklift incidents?", "intent": None, "answer": None}
-    )
-    assert "couldn't fetch" in result["answer"]
-
-
-def test_parse_intent_falls_back_to_general_on_malformed_reply(session_factory):
-    vss_client = FakeVSSClient(answer="fine")
-    graph = build_chat_graph(FakeLLMIntent("nonsense"), vss_client, session_factory)
+def test_generic_message_routes_to_incidents_query(session_factory):
+    vss_client = FakeVSSClient()
+    llm = FakeLLM("No incidents found.")
+    graph = build_chat_graph(llm, vss_client, session_factory)
     result = graph.invoke({"message": "anything", "intent": None, "answer": None})
-    assert vss_client.messages_received == ["anything"]
-    assert result["answer"] == "fine"
+
+    assert result["answer"] == "No incidents found."
+    assert vss_client.messages_received == []
+
+
+def test_video_keywords_route_to_video_question(session_factory):
+    vss_client = FakeVSSClient(answer="forklift visible")
+    llm = FakeLLM()
+    graph = build_chat_graph(llm, vss_client, session_factory)
+    result = graph.invoke({"message": "what is happening in the footage?", "intent": None, "answer": None})
+    assert vss_client.messages_received != []
+    assert result["answer"] == "forklift visible"
+
+
+def test_sop_keywords_route_to_sop_suggestion(session_factory):
+    vss_client = FakeVSSClient()
+    llm = FakeLLM("Add safety barriers.")
+    graph = build_chat_graph(llm, vss_client, session_factory)
+    result = graph.invoke({"message": "how can we prevent accidents?", "intent": None, "answer": None})
+    assert vss_client.messages_received == []
+    assert result["answer"] == "Add safety barriers."

@@ -57,7 +57,7 @@ def test_get_new_alerts_normalizes_real_payload_shape():
     assert alerts[0]["category"] == "ppe"
     assert alerts[0]["sensor_id"] == "Camera_01"
     assert alerts[0]["description"] == "PPE Violation"
-    assert alerts[1]["category"] == "Load Quality Violation"
+    assert alerts[1]["category"] == "spill"  # Load Quality Violation maps to spill
 
 
 @respx.mock
@@ -121,26 +121,6 @@ def test_chat_strips_agent_think_and_incidents_noise():
 
 
 @respx.mock
-def test_generate_report_builds_prompt_from_incident_and_calls_chat():
-    route = respx.post("http://agent.test/chat").mock(
-        return_value=Response(200, json={
-            "choices": [{"message": {"content": "Person down in aisle-3.", "role": "assistant"}}],
-        })
-    )
-    client = make_client()
-    incident = {
-        "id": 1, "hazard_type": "fall", "severity": "critical", "status": "open",
-        "zone": "aisle-3", "caption": "person down", "report_text": None,
-        "created_at": "2026-06-21T12:00:00", "updated_at": "2026-06-21T12:00:00",
-    }
-    report = client.generate_report(incident)
-    assert report == "Person down in aisle-3."
-    sent_body = route.calls.last.request.content
-    assert b"aisle-3" in sent_body
-    assert b"fall" in sent_body
-
-
-@respx.mock
 def test_register_alert_rules_posts_each_rule_and_returns_ids():
     respx.post("http://alertbridge.test/api/v1/realtime").mock(side_effect=[
         Response(200, json={"id": "rule-1", "status": "success", "message": "created"}),
@@ -153,6 +133,32 @@ def test_register_alert_rules_posts_each_rule_and_returns_ids():
     ]
     ids = client.register_alert_rules("rtsp://localhost:8554/cam1", "cam1", rules)
     assert ids == ["rule-1", "rule-2"]
+
+
+@respx.mock
+def test_register_alert_rules_sends_uuid_sensor_id_not_raw_name():
+    # Real VSS (RTVI-VLM streams/add) rejects non-UUID sensor/stream ids, so
+    # the client must translate a human-readable sensor_id to a UUID before
+    # sending it, and remember the mapping for resolve_sensor_id.
+    route = respx.post("http://alertbridge.test/api/v1/realtime").mock(
+        return_value=Response(200, json={"id": "rule-1", "status": "success", "message": "created"})
+    )
+    client = make_client()
+    rules = [{"alert_type": "ppe", "prompt": "p1", "system_prompt": "s1"}]
+    client.register_alert_rules("rtsp://localhost:8554/fall", "fall", rules)
+
+    sent_sensor_id = route.calls[0].request.content
+    import json as _json
+    body = _json.loads(sent_sensor_id)
+    assert body["sensor_id"] != "fall"
+    import uuid as _uuid
+    _uuid.UUID(body["sensor_id"])  # raises if not a valid UUID
+    assert client.resolve_sensor_id(body["sensor_id"]) == "fall"
+
+
+def test_resolve_sensor_id_passes_through_unknown_ids():
+    client = make_client()
+    assert client.resolve_sensor_id("some-other-id") == "some-other-id"
 
 
 @respx.mock

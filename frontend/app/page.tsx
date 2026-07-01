@@ -10,7 +10,12 @@ import { Incident, fetchIncidents, subscribeToAlerts, videoUrl } from "../lib/ap
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [activeFilename, setActiveFilename] = useState<string | null>(null);
+  const [activeFilename, setActiveFilename] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("activeFilename");
+    }
+    return null;
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -47,7 +52,10 @@ export default function Home() {
         </div>
 
         <div className="mt-6">
-          <UploadBar onUploaded={setActiveFilename} />
+          <UploadBar onUploaded={(filename) => {
+            sessionStorage.setItem("activeFilename", filename);
+            setActiveFilename(filename);
+          }} />
         </div>
 
         {activeFilename && (

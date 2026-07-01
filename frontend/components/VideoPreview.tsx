@@ -9,6 +9,7 @@ const VideoPreview = forwardRef<HTMLVideoElement, { src: string }>(function Vide
       ref={ref}
       data-testid="video-preview"
       controls
+      loop
       className="w-full border border-paper/15 bg-ink"
     >
       <source src={src} type="video/mp4" />

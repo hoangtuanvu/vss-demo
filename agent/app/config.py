@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     poll_interval_seconds: int = 8
     dedupe_window_seconds: int = 300
     mediamtx_rtsp_url: str = "rtsp://localhost:8554"
+    public_rtsp_base_url: str = ""
+    """Externally-reachable RTSP base URL for VSS to subscribe to, when it
+    differs from mediamtx_rtsp_url (e.g. a remote VSS deployment can't resolve
+    a local docker-network hostname like "mediamtx"). Falls back to
+    mediamtx_rtsp_url when unset (same-host VSS deployments)."""
 
 
 _settings: Settings | None = None

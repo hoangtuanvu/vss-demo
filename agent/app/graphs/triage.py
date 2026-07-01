@@ -110,13 +110,26 @@ from app.models import IncidentStatus
 
 logger = logging.getLogger(__name__)
 
+REPORT_PROMPT = (
+    "Write a concise warehouse safety incident report.\n"
+    "Hazard type: {hazard_type}\nSeverity: {severity}\nZone: {zone}\n"
+    "Description: {caption}\nDetected at: {created_at}\n"
+    "Report:"
+)
 
-def make_generate_report_node(vss_client, session_factory) -> Callable[[dict], dict]:
+
+def make_generate_report_node(llm, session_factory) -> Callable[[dict], dict]:
     def generate_report(state: dict) -> dict:
         with session_factory() as session:
             incident = store.get_incident(session, state["incident_id"])
             incident_dict = incident_to_dict(incident)
-        report_text = vss_client.generate_report(incident_dict)
+        try:
+            report_text = llm.invoke(REPORT_PROMPT.format(**incident_dict)).content.strip()
+        except Exception:
+            report_text = (
+                f"Incident report: {incident_dict['hazard_type']} detected in "
+                f"{incident_dict['zone']} at {incident_dict['created_at']}."
+            )
         with session_factory() as session:
             store.update_incident(session, state["incident_id"], report_text=report_text)
         return {"report_text": report_text}
@@ -156,12 +169,12 @@ def route_by_severity(state: dict) -> Literal["critical", "end"]:
     return "critical" if state["severity"] == Severity.CRITICAL.value else "end"
 
 
-def build_triage_graph(llm, vss_client, session_factory, webhook_url: str, dedupe_window_seconds: int, broadcaster, upload_state):
+def build_triage_graph(llm, session_factory, webhook_url: str, dedupe_window_seconds: int, broadcaster, upload_state):
     graph = StateGraph(TriageState)
     graph.add_node("classify_severity", make_classify_severity_node(llm))
     graph.add_node("dedupe", make_dedupe_node(session_factory, dedupe_window_seconds))
     graph.add_node("persist_incident", make_persist_incident_node(session_factory, broadcaster, upload_state))
-    graph.add_node("generate_report", make_generate_report_node(vss_client, session_factory))
+    graph.add_node("generate_report", make_generate_report_node(llm, session_factory))
     graph.add_node("escalate_notify", make_escalate_notify_node(webhook_url, session_factory))
     graph.set_entry_point("classify_severity")
     graph.add_edge("classify_severity", "dedupe")
